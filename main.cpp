@@ -210,9 +210,54 @@ int main(){
   puts("CONNECTED");
 #endif
 
-  int size = DEFAULT_SIZE;
-  char *buffer = (char *)malloc(sizeof(*buffer) * size);
-  int recv_size = recv(clientsock, buffer, size, 0);
+  { //RECV DATA
+    int size = DEFAULT_SIZE;
+    unsigned char *buffer = (unsigned char *)malloc(sizeof(*buffer) * size);
+    int recv_size = recv(clientsock, (char *)buffer, size, 0);
+    //if msb of first byte is 1 then it is full message
+    int is_complete_msg = 0;
+    int bytes_idx = 0;
+    if ((buffer[bytes_idx] & 128) == 128) is_complete_msg = 1;
+
+    bytes_idx += 1;
+    //If first bit is masked then it will be from client
+    //server wont mast the first bit
+    assert((buffer[bytes_idx] & 128) == 128);
+    //if reset of the bits are below 126 then it is length
+    int msg_len = 0;
+    if (((buffer[bytes_idx] & ~128) & 0xff) <= 125) {
+      msg_len = (buffer[bytes_idx] & ~128) & 0xff ;
+      bytes_idx += 1;
+    }
+    //if reset of the bits are 126 then length is next two bytes
+    else if (((buffer[bytes_idx] & ~128) & 0xff) == 126){
+      msg_len = ntohs(*(short *) (buffer + bytes_idx + 1));
+      bytes_idx += 2;
+      bytes_idx += 1;
+    }
+    //if reset of the bits are 127 then length is next eight bytes
+    else if (((buffer[bytes_idx] & ~128) & 0xff) == 127){
+      // THIS LARGE???
+      msg_len = ntohll(*(unsigned __int64 *) (buffer + bytes_idx + 1));
+      bytes_idx += 8;
+      bytes_idx += 1;
+    }
+
+    // KEYS are 4 bytes that xor message for some reason
+    unsigned char keys[4];
+    for (int idx = 0 ; idx < 4; idx++) {
+      keys[idx] = buffer[bytes_idx];
+      bytes_idx += 1;
+    }
+  
+    int remaining_len = recv_size - bytes_idx;
+    unsigned char *msg = buffer + bytes_idx;
+    for (int idx = 0; idx <= msg_len && idx <= remaining_len; idx++) {
+      msg[idx] ^= keys[idx % 4];
+    }
+
+    printf("%.*s\n", msg_len, msg);
+  }
   closesocket(clientsock);
   closesocket(sock);
 
