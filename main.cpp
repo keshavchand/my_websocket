@@ -243,6 +243,8 @@ int main(){
       bytes_idx += 1;
     }
 
+    assert(msg_len <= recv_size - bytes_idx + 4);
+
     // KEYS are 4 bytes that xor message for some reason
     unsigned char keys[4];
     for (int idx = 0 ; idx < 4; idx++) {
@@ -256,7 +258,40 @@ int main(){
       msg[idx] ^= keys[idx % 4];
     }
 
+    free(buffer);
     printf("%.*s\n", msg_len, msg);
+  }
+ 
+  {//SEND DATA
+    int size = DEFAULT_SIZE;
+    unsigned char *buffer = (unsigned char*) malloc(sizeof(*buffer) * size);
+    int bytes_idx = 0;
+    //First bit set because its complete message
+    //else its next
+    buffer[bytes_idx] = 129;
+    bytes_idx += 1;
+    
+    char * msg = "HELLO WORLD";
+    int msg_size = strlen(msg);
+    if (msg_size <= 125) {
+      buffer[bytes_idx] = msg_size;
+    } else if (msg_size == 126) {
+      buffer[bytes_idx] = 126;
+      *(short *)(buffer + bytes_idx + 1) = htons(msg_size);
+      bytes_idx += 2;
+    }else if (msg_size == 127) {
+      buffer[bytes_idx] = 127;
+      *(unsigned __int64 *)(buffer + bytes_idx + 1) = htonll(msg_size);
+      bytes_idx += 8;
+    }
+    bytes_idx += 1;
+
+    int remaining_size = size - bytes_idx;
+    for (int i = 0 ; i < msg_size && i < remaining_size; i++) {
+      buffer[bytes_idx] = msg[i];  
+      bytes_idx += 1;
+    }
+    send(clientsock, (const char*) buffer, bytes_idx, 0);
   }
   closesocket(clientsock);
   closesocket(sock);
