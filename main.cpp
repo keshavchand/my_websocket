@@ -67,10 +67,10 @@ bool process_ws_data(char *buffer, int total_read, char* response, int* resp_len
   }
   
   //MUST HAVES
-  bool avail_Upgrade;
-  bool avail_Connection;
-  bool avail_Sec_WebSocket_Key;
-  bool avail_Sec_WebSocket_Version;
+  bool avail_Upgrade = 0;
+  bool avail_Connection = 0;
+  bool avail_Sec_WebSocket_Key = 0;
+  bool avail_Sec_WebSocket_Version = 0;
 
   char *ws_magic_value = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
   char ws_server_return[30];
@@ -121,13 +121,21 @@ bool process_ws_data(char *buffer, int total_read, char* response, int* resp_len
     }
   }
 
-  // Generate Server response 
-  {
-    *resp_len = snprintf(response, *resp_len, "HTTP/1.1 101 Switching Protocol\r\n" \
+  if (avail_Connection && avail_Upgrade && avail_Sec_WebSocket_Key && avail_Sec_WebSocket_Version) {
+    // Generate Server response 
+    *resp_len = snprintf(response, *resp_len, 
+        "HTTP/1.1 101 Switching Protocol\r\n" \
         "Upgrade: websocket\r\n"\
         "Connection: Upgrade\r\n"\
         "Sec-WebSocket-Accept: %s\r\n\r\n", ws_server_return);
 
+    printf("%.*s", *resp_len, response);
+  }else {
+    // SEND 400
+    *resp_len = snprintf(response, *resp_len, 
+        "HTTP/1.1 400 Bad Request\r\n" \
+        "Content-Type: text/html; charset=UTF-8\r\n"\
+        "\r\n%s", "<HTML> BAD WEBSOCKET REQUEST </HTML>");
     printf("%.*s", *resp_len, response);
   }
 }
@@ -186,6 +194,7 @@ int main(){
 
   int listen_ret = listen(sock, SOMAXCONN);
   if(listen_ret) print_and_exit(-1, "CANT LISTEN");
+  
 
   int clientsock = accept(sock, NULL, NULL);
   if(clientsock == INVALID_SOCKET) print_and_exit(-1, "CANT CONNECT CLIENT");

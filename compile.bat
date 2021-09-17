@@ -1,4 +1,4 @@
 @echo off
-cl -Zi Ws2_32.lib main.cpp || pause
+cl -Zi /Incremental:NO Crypt32.lib Advapi32.lib Ws2_32.lib main.cpp || pause
 exit
 
